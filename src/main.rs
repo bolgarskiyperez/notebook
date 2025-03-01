@@ -3,26 +3,25 @@ mod services;
 
 use services::t_services::TaskManager;
 use services::t_storage::TaskStorage;
-use models::task::Task;
 use std::io::{self, Write};
 
 fn main() {
-    let task_storage = TaskStorage{};
-    
+    let task_storage = TaskStorage {};
+    let mut task_manager = TaskManager::new(task_storage);
+
     let file_path = "tasks.json";
-    let mut tasks = match task_storage.read_tasks(file_path) {
+    let tasks = match task_manager.task_storage.read_tasks(file_path) {
         Ok(tasks) => tasks,
         Err(_) => {
-            println!("Failed to read tasks from file. Starting new an empty list");
+            println!("Failed to read tasks from file. Starting with an empty list.");
             Vec::new()
         }
     };
 
-    let task_manager = TaskManager{tasks: vec![], next_id: 1};
+    task_manager.tasks = tasks; // Присваиваем задачи из файла
 
-
-    loop{
-        println!("Choose an option:");
+    loop {
+        println!("\nChoose an option:");
         println!("1. Add task");
         println!("2. Delete task");
         println!("3. View tasks");
@@ -32,21 +31,31 @@ fn main() {
 
         match choice {
             1 => {
-                let task = create_task();
-                task_manager.add_task(&mut tasks, task);
+                println!("Enter the title:");
+                let title = read_line();
+
+                println!("Enter the description:");
+                let description = read_line();
+
+                task_manager.add_task(&title, description);
             }
             2 => {
                 println!("Enter the task ID to delete:");
-                let id = read_input();
-                delete_task(&mut tasks, id);
+                let id: usize = read_input();
+                task_manager.delete_task(id);
             }
             3 => {
-                list_tasks(&tasks);
+                println!("\nCurrent tasks:");
+                for task in &task_manager.tasks {
+                    println!(
+                        "ID: {}, Title: {}, Completed: {}, Description: {}", 
+                        task.id, task.title, task.completed, task.description
+                    );
+                }
             }
             4 => {
-                if let Err(e) = write_tasks(file_path, &tasks) {
-                    println!("Error saving tasks: {}", e);
-                }
+                task_manager.task_storage.write_tasks(file_path, &task_manager.tasks).expect("Error saving tasks");
+                println!("Tasks saved. Exiting...");
                 break;
             }
             _ => {
@@ -56,18 +65,10 @@ fn main() {
     }
 }
 
-fn read_input() -> u32 {
+fn read_input() -> usize {
     let mut input = String::new();
     io::stdin().read_line(&mut input).expect("Failed to read input");
     input.trim().parse().unwrap_or(0)
-}
-
-fn create_task() -> Task {
-    println!("Enter task ID:");
-    let id = read_input();
-    println!("Enter task description:");
-    let description = read_line();
-    Task { id, description }
 }
 
 fn read_line() -> String {
